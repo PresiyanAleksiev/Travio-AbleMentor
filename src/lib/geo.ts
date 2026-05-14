@@ -17,6 +17,36 @@ export function roadKm(a: Coords, b: Coords) {
   return Math.round(haversineKm(a, b) * 1.25);
 }
 
+// Decode Google encoded polyline (precision 5) to [lat, lng] pairs.
+export function decodePolyline(str: string): Array<[number, number]> {
+  let index = 0, lat = 0, lng = 0;
+  const out: Array<[number, number]> = [];
+  while (index < str.length) {
+    let b: number, shift = 0, result = 0;
+    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+    shift = 0; result = 0;
+    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+    out.push([lat * 1e-5, lng * 1e-5]);
+  }
+  return out;
+}
+
+// Minimum distance (km) from a point to any segment in a polyline path.
+export function distanceToPathKm(p: Coords, path: Coords[]): number {
+  if (path.length === 0) return Infinity;
+  if (path.length === 1) return haversineKm(p, path[0]);
+  let min = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    const d = distanceToSegmentKm(p, path[i], path[i + 1]);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
 // Project lat/lng to local equirectangular km plane (good for short distances)
 function toXY(p: Coords, ref: Coords) {
   const x = ((p.lng - ref.lng) * Math.PI) / 180 * R * Math.cos((ref.lat * Math.PI) / 180);
