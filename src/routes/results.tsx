@@ -1,11 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
   Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
 } from "lucide-react";
 import { CITY_COORDS, LANDMARKS, type Coords, type Landmark } from "@/lib/bulgaria-data";
-import { distanceToSegmentKm, roadKm } from "@/lib/geo";
+import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
+import { getDirections } from "@/lib/directions.functions";
 import { RouteMap } from "@/components/RouteMap";
 import { Header, Footer } from "./index";
 
@@ -55,8 +58,8 @@ function lookupCoords(name: string): Coords | null {
   return CITY_COORDS[name.trim().toLowerCase()] ?? null;
 }
 
-function generateRoutes(seed: number, km: number): RouteOption[] {
-  const fastestTotalMin = Math.max(45, Math.round((km / 95) * 60));
+function generateRoutes(seed: number, km: number, realDriveMin?: number): RouteOption[] {
+  const fastestTotalMin = realDriveMin ?? Math.max(45, Math.round((km / 95) * 60));
   const cheapestTotalMin = Math.round((km / 70) * 60) + 60;
   const convTotalMin = Math.round((km / 80) * 60) + 20;
 
@@ -110,9 +113,19 @@ function generateAlerts(seed: number): Alert[] {
   return [0,1,2].map((i) => pool[(seed + i * 7) % pool.length]);
 }
 
-function landmarksAlongRoute(from: Coords, to: Coords): Array<Landmark & { detourKm: number }> {
+function landmarksAlongRoute(
+  from: Coords,
+  to: Coords,
+  path?: Coords[],
+): Array<Landmark & { detourKm: number }> {
   return LANDMARKS
-    .map((l) => ({ ...l, detourKm: distanceToSegmentKm({ lat: l.lat, lng: l.lng }, from, to) }))
+    .map((l) => {
+      const p = { lat: l.lat, lng: l.lng };
+      const detourKm = path && path.length > 1
+        ? distanceToPathKm(p, path)
+        : distanceToSegmentKm(p, from, to);
+      return { ...l, detourKm };
+    })
     .filter((l) => l.detourKm <= MAX_LANDMARK_KM)
     .sort((a, b) => a.detourKm - b.detourKm);
 }
@@ -128,19 +141,38 @@ const CAT_META: Record<Category, { label: string; tagline: string; icon: typeof 
 function ResultsPage() {
   const { from, to } = Route.useSearch();
 
-  const trip = useMemo(() => {
+  const base = useMemo(() => {
     const fromCoords = lookupCoords(from);
     const toCoords = lookupCoords(to);
     if (!fromCoords || !toCoords) return null;
-    const km = roadKm(fromCoords, toCoords);
     const seed = hashStr(from.toLowerCase() + "→" + to.toLowerCase());
-    return {
-      fromCoords, toCoords, km, seed,
-      routes: generateRoutes(seed, km),
-      alerts: generateAlerts(seed),
-      landmarks: landmarksAlongRoute(fromCoords, toCoords),
-    };
+    return { fromCoords, toCoords, seed };
   }, [from, to]);
+
+  const fetchDirections = useServerFn(getDirections);
+  const directionsQuery = useQuery({
+    queryKey: ["directions", from, to],
+    enabled: !!base,
+    queryFn: () => fetchDirections({ data: { from: base!.fromCoords, to: base!.toCoords } }),
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const trip = useMemo(() => {
+    if (!base) return null;
+    const dir = directionsQuery.data;
+    const decoded = dir ? decodePolyline(dir.polyline).map(([lat, lng]) => ({ lat, lng })) : undefined;
+    const km = dir ? Math.round(dir.distanceKm) : roadKm(base.fromCoords, base.toCoords);
+    const realDriveMin = dir?.durationMin;
+    return {
+      ...base,
+      km,
+      pathLatLng: decoded ? (decoded.map((c) => [c.lat, c.lng]) as Array<[number, number]>) : undefined,
+      pathCoords: decoded,
+      routes: generateRoutes(base.seed, km, realDriveMin),
+      alerts: generateAlerts(base.seed),
+      landmarks: landmarksAlongRoute(base.fromCoords, base.toCoords, decoded),
+    };
+  }, [base, directionsQuery.data]);
 
   return (
     <main className="min-h-screen bg-background">
@@ -174,7 +206,11 @@ function ResultsPage() {
                 {from} <span className="text-muted-foreground">→</span> {to}
               </h1>
               <span className="text-sm text-muted-foreground">
-                ~{trip.km} km · 3 routes · estimates in EUR
+                {directionsQuery.isLoading
+                  ? "Loading live route from Google…"
+                  : directionsQuery.isError
+                    ? `~${trip.km} km · live route unavailable, showing estimates`
+                    : `${trip.km} km · live Google route · estimates in EUR`}
               </span>
             </div>
 
@@ -185,7 +221,13 @@ function ResultsPage() {
             <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
               <section>
                 <SectionHeader icon={MapIcon} title="Route on the map" subtitle="OpenStreetMap overview of your trip" />
-                <RouteMap from={trip.fromCoords} to={trip.toCoords} fromName={from} toName={to} />
+                <RouteMap
+                  from={trip.fromCoords}
+                  to={trip.toCoords}
+                  fromName={from}
+                  toName={to}
+                  path={trip.pathLatLng}
+                />
               </section>
               <section>
                 <SectionHeader icon={AlertTriangle} title="Live alerts" subtitle="Schedule changes & traffic now" />
