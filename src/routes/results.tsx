@@ -58,8 +58,8 @@ function lookupCoords(name: string): Coords | null {
   return CITY_COORDS[name.trim().toLowerCase()] ?? null;
 }
 
-function generateRoutes(seed: number, km: number): RouteOption[] {
-  const fastestTotalMin = Math.max(45, Math.round((km / 95) * 60));
+function generateRoutes(seed: number, km: number, realDriveMin?: number): RouteOption[] {
+  const fastestTotalMin = realDriveMin ?? Math.max(45, Math.round((km / 95) * 60));
   const cheapestTotalMin = Math.round((km / 70) * 60) + 60;
   const convTotalMin = Math.round((km / 80) * 60) + 20;
 
