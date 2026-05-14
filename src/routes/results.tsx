@@ -1,0 +1,363 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
+import {
+  Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
+  Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
+} from "lucide-react";
+import { CITY_COORDS, LANDMARKS, type Coords, type Landmark } from "@/lib/bulgaria-data";
+import { distanceToSegmentKm, roadKm } from "@/lib/geo";
+import { RouteMap } from "@/components/RouteMap";
+import { Header, Footer } from "./index";
+
+interface SearchParams { from: string; to: string }
+
+export const Route = createFileRoute("/results")({
+  validateSearch: (s: Record<string, unknown>): SearchParams => ({
+    from: typeof s.from === "string" ? s.from : "",
+    to: typeof s.to === "string" ? s.to : "",
+  }),
+  head: ({ match }) => {
+    const { from, to } = match.search as SearchParams;
+    const title = from && to ? `${from} → ${to} — Travio` : "Routes — Travio";
+    return {
+      meta: [
+        { title },
+        { name: "description", content: `Compare bus, train and car routes from ${from || "your start"} to ${to || "your destination"} in Bulgaria.` },
+        { property: "og:title", content: title },
+      ],
+    };
+  },
+  component: ResultsPage,
+});
+
+type Mode = "bus" | "train" | "car";
+type Category = "fastest" | "cheapest" | "convenient";
+
+interface RouteOption {
+  category: Category;
+  mode: Mode;
+  hours: number;
+  minutes: number;
+  cost: number;
+  note: string;
+  breakdown: { label: string; amount: number; icon: typeof Fuel }[];
+}
+
+interface Alert { level: "info" | "warning" | "delay"; title: string; body: string }
+
+const MAX_LANDMARK_KM = 30;
+
+function hashStr(s: string) {
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function lookupCoords(name: string): Coords | null {
+  return CITY_COORDS[name.trim().toLowerCase()] ?? null;
+}
+
+function generateRoutes(seed: number, km: number): RouteOption[] {
+  const fastestTotalMin = Math.max(45, Math.round((km / 95) * 60));
+  const cheapestTotalMin = Math.round((km / 70) * 60) + 60;
+  const convTotalMin = Math.round((km / 80) * 60) + 20;
+
+  const fuel = Math.round(km * 0.085 * 10) / 10;
+  const tolls = km > 200 ? Math.round((km * 0.012) * 10) / 10 : 0;
+  const fastestCost = Math.round((fuel + tolls) * 10) / 10;
+
+  const ticket = Math.round((km * 0.045 + 4) * 10) / 10;
+  const transfer = Math.round((seed % 3) * 1.5 * 10) / 10;
+  const taxiToTerminal = 4 + (seed % 4);
+  const cheapestCost = Math.round((ticket + transfer + taxiToTerminal) * 10) / 10;
+
+  const trainTicket = Math.round((km * 0.06 + 5) * 10) / 10;
+  const taxiToStation = 5 + (seed % 5);
+  const convCost = Math.round((trainTicket + taxiToStation) * 10) / 10;
+
+  return [
+    { category: "fastest",    mode: "car",   hours: Math.floor(fastestTotalMin/60), minutes: fastestTotalMin%60, cost: fastestCost,
+      note: "Direct highway route via private car",
+      breakdown: [
+        { label: "Fuel (~7L/100km)", amount: fuel, icon: Fuel },
+        { label: "Tolls & vignette", amount: tolls, icon: Ticket },
+        { label: "Taxi", amount: 0, icon: CarTaxiFront },
+      ]},
+    { category: "cheapest",   mode: "bus",   hours: Math.floor(cheapestTotalMin/60), minutes: cheapestTotalMin%60, cost: cheapestCost,
+      note: "Intercity bus, may include a transfer",
+      breakdown: [
+        { label: "Bus ticket", amount: ticket, icon: Ticket },
+        { label: "Transfer fee", amount: transfer, icon: Bus },
+        { label: "Taxi to terminal", amount: taxiToTerminal, icon: CarTaxiFront },
+      ]},
+    { category: "convenient", mode: "train", hours: Math.floor(convTotalMin/60), minutes: convTotalMin%60, cost: convCost,
+      note: "Direct train, comfortable seating",
+      breakdown: [
+        { label: "Train ticket", amount: trainTicket, icon: Ticket },
+        { label: "Fuel", amount: 0, icon: Fuel },
+        { label: "Taxi to station", amount: taxiToStation, icon: CarTaxiFront },
+      ]},
+  ];
+}
+
+function generateAlerts(seed: number): Alert[] {
+  const pool: Alert[] = [
+    { level: "delay",   title: "Train BV 8612 delayed 25 min", body: "BDŽ reports a signaling issue near Mezdra. Connections may be affected." },
+    { level: "warning", title: "Heavy traffic on A1 near Trakia", body: "Average speeds dropping to 35 km/h between Plovdiv and Stara Zagora." },
+    { level: "info",    title: "Bus terminal change", body: "Departures temporarily moved to Serdika Center bay 4." },
+    { level: "warning", title: "Vignette checkpoint active", body: "Road police are inspecting vignettes on the Hemus highway." },
+    { level: "delay",   title: "Rain expected in the Balkan range", body: "Plan extra time on mountain passes after 6pm." },
+    { level: "info",    title: "Discounted weekend train fares", body: "BDŽ offers 30% off return tickets through Sunday." },
+  ];
+  return [0,1,2].map((i) => pool[(seed + i * 7) % pool.length]);
+}
+
+function landmarksAlongRoute(from: Coords, to: Coords): Array<Landmark & { detourKm: number }> {
+  return LANDMARKS
+    .map((l) => ({ ...l, detourKm: distanceToSegmentKm({ lat: l.lat, lng: l.lng }, from, to) }))
+    .filter((l) => l.detourKm <= MAX_LANDMARK_KM)
+    .sort((a, b) => a.detourKm - b.detourKm);
+}
+
+const MODE_ICON: Record<Mode, typeof Bus> = { bus: Bus, train: Train, car: Car };
+const MODE_LABEL: Record<Mode, string> = { bus: "Bus", train: "Train", car: "Car" };
+const CAT_META: Record<Category, { label: string; tagline: string; icon: typeof Zap; accent: string }> = {
+  fastest:    { label: "Fastest",         tagline: "Save hours",          icon: Zap,        accent: "from-primary to-accent" },
+  cheapest:   { label: "Cheapest",        tagline: "Stretch your budget", icon: PiggyBank,  accent: "from-secondary to-primary" },
+  convenient: { label: "Most Convenient", tagline: "Smoothest ride",      icon: Sparkles,   accent: "from-accent to-secondary" },
+};
+
+function ResultsPage() {
+  const { from, to } = Route.useSearch();
+
+  const trip = useMemo(() => {
+    const fromCoords = lookupCoords(from);
+    const toCoords = lookupCoords(to);
+    if (!fromCoords || !toCoords) return null;
+    const km = roadKm(fromCoords, toCoords);
+    const seed = hashStr(from.toLowerCase() + "→" + to.toLowerCase());
+    return {
+      fromCoords, toCoords, km, seed,
+      routes: generateRoutes(seed, km),
+      alerts: generateAlerts(seed),
+      landmarks: landmarksAlongRoute(fromCoords, toCoords),
+    };
+  }, [from, to]);
+
+  return (
+    <main className="min-h-screen bg-background">
+      <Header />
+
+      <div className="mx-auto max-w-6xl px-6 pt-8">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> New search
+        </Link>
+      </div>
+
+      <section className="mx-auto max-w-6xl px-6 py-10">
+        {!from || !to ? (
+          <EmptyState />
+        ) : !trip ? (
+          <div className="rounded-3xl border border-border bg-card p-8 text-center">
+            <p className="text-foreground">
+              We don't have coordinates for <strong>{from}</strong> or <strong>{to}</strong> yet.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Try a major Bulgarian city from the home page.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-14">
+            <div className="flex items-baseline justify-between gap-4 flex-wrap">
+              <h1 className="font-display text-3xl font-bold text-foreground sm:text-5xl">
+                {from} <span className="text-muted-foreground">→</span> {to}
+              </h1>
+              <span className="text-sm text-muted-foreground">
+                ~{trip.km} km · 3 routes · estimates in EUR
+              </span>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-3">
+              {trip.routes.map((r) => <RouteCard key={r.category} route={r} />)}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+              <section>
+                <SectionHeader icon={MapIcon} title="Route on the map" subtitle="OpenStreetMap overview of your trip" />
+                <RouteMap from={trip.fromCoords} to={trip.toCoords} fromName={from} toName={to} />
+              </section>
+              <section>
+                <SectionHeader icon={AlertTriangle} title="Live alerts" subtitle="Schedule changes & traffic now" />
+                <div className="space-y-3">
+                  {trip.alerts.map((a, i) => <AlertCard key={i} alert={a} />)}
+                </div>
+              </section>
+            </div>
+
+            <section>
+              <SectionHeader
+                icon={Sparkles}
+                title="Worth a stop along the way"
+                subtitle={`Landmarks within ${MAX_LANDMARK_KM} km of your route`}
+              />
+              {trip.landmarks.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
+                  No notable landmarks within {MAX_LANDMARK_KM} km of this route.
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {trip.landmarks.map((l) => <LandmarkCard key={l.name} landmark={l} />)}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </section>
+
+      <Footer />
+    </main>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-3xl border border-border bg-card p-10 text-center">
+      <h2 className="font-display text-2xl font-bold text-foreground">Pick a start and destination</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Head back to the home page and choose your cities.
+      </p>
+      <Link
+        to="/"
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl px-5 py-3 font-semibold text-primary-foreground"
+        style={{ background: "var(--gradient-hero)" }}
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to search
+      </Link>
+    </div>
+  );
+}
+
+function RouteCard({ route }: { route: RouteOption }) {
+  const meta = CAT_META[route.category];
+  const ModeIcon = MODE_ICON[route.mode];
+  const CatIcon = meta.icon;
+  return (
+    <article
+      className="group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card p-6 transition-all hover:-translate-y-1"
+      style={{ boxShadow: "var(--shadow-card)" }}
+    >
+      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${meta.accent}`} />
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <CatIcon className="h-3.5 w-3.5" />{meta.tagline}
+          </div>
+          <h3 className="mt-1 font-display text-2xl font-bold text-foreground">{meta.label}</h3>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-foreground">
+          <ModeIcon className="h-5 w-5" />
+        </div>
+      </div>
+      <div className="mt-6 flex items-end justify-between border-t border-border pt-5">
+        <Stat icon={<Clock className="h-4 w-4" />} label="Time" value={`${route.hours}h ${route.minutes.toString().padStart(2, "0")}m`} />
+        <Stat icon={<Euro className="h-4 w-4" />} label="Total" value={`€${route.cost.toFixed(2)}`} align="right" />
+      </div>
+      <p className="mt-5 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{MODE_LABEL[route.mode]}</span> · {route.note}
+      </p>
+      <div className="mt-5 rounded-2xl bg-muted/60 p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cost breakdown</div>
+        <ul className="mt-3 space-y-2">
+          {route.breakdown.map((b) => {
+            const Icon = b.icon;
+            return (
+              <li key={b.label} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-foreground">
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground" />{b.label}
+                </span>
+                <span className="font-semibold text-foreground tabular-nums">€{b.amount.toFixed(2)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </article>
+  );
+}
+
+function Stat({ icon, label, value, align = "left" }: { icon: React.ReactNode; label: string; value: string; align?: "left" | "right" }) {
+  return (
+    <div className={align === "right" ? "text-right" : ""}>
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {align === "left" && icon}{label}{align === "right" && icon}
+      </div>
+      <div className="mt-1 font-display text-2xl font-bold text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function SectionHeader({ icon: Icon, title, subtitle }: { icon: typeof MapIcon; title: string; subtitle: string }) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <div>
+        <h3 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
+          <Icon className="h-5 w-5 text-primary" />{title}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function AlertCard({ alert }: { alert: Alert }) {
+  const config = {
+    delay:   { Icon: Clock,         dot: "bg-primary",   label: "Delay" },
+    warning: { Icon: AlertTriangle, dot: "bg-accent",    label: "Warning" },
+    info:    { Icon: Info,          dot: "bg-secondary", label: "Info" },
+  }[alert.level];
+  const { Icon } = config;
+  return (
+    <article className="rounded-2xl border border-border bg-card p-4" style={{ boxShadow: "var(--shadow-card)" }}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
+          <Icon className="h-4 w-4 text-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {config.label} · live
+            </span>
+          </div>
+          <h4 className="mt-1 font-semibold text-foreground">{alert.title}</h4>
+          <p className="mt-1 text-sm text-muted-foreground">{alert.body}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } }) {
+  return (
+    <article
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-1"
+      style={{ boxShadow: "var(--shadow-card)" }}
+    >
+      <div
+        className="mb-4 flex h-24 w-full items-center justify-center rounded-xl text-5xl"
+        style={{ background: "var(--gradient-warm)", opacity: 0.95 }}
+      >
+        <span aria-hidden>{landmark.emoji}</span>
+      </div>
+      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span><CloudRain className="mr-1 inline h-3 w-3" />{landmark.city}</span>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-foreground">
+          {landmark.detourKm < 1 ? "on route" : `${landmark.detourKm.toFixed(0)} km off`}
+        </span>
+      </div>
+      <h4 className="mt-1 font-display text-lg font-bold text-foreground">{landmark.name}</h4>
+      <p className="mt-1 text-sm text-muted-foreground">{landmark.description}</p>
+    </article>
+  );
+}
