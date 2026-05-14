@@ -269,7 +269,7 @@ function RouteCard({ route }: { route: RouteOption }) {
       <div className="mt-5 rounded-2xl bg-muted/60 p-4">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cost breakdown</div>
         <ul className="mt-3 space-y-2">
-          {route.breakdown.map((b) => {
+          {route.breakdown.filter((b) => b.amount > 0).map((b) => {
             const Icon = b.icon;
             return (
               <li key={b.label} className="flex items-center justify-between text-sm">
