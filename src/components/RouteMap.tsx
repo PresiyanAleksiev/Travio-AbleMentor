@@ -51,13 +51,16 @@ export function RouteMap({
   }
 
   const { MapContainer, TileLayer, Marker, Polyline, Tooltip } = Comp.RL;
-  const positions: [number, number][] =
-    path && path.length > 1 ? path : [[from.lat, from.lng], [to.lat, to.lng]];
+  const isReal = !!(path && path.length > 1);
+  const positions: [number, number][] = isReal
+    ? path!
+    : [[from.lat, from.lng], [to.lat, to.lng]];
+  const startPos: [number, number] = [from.lat, from.lng];
+  const endPos: [number, number] = [to.lat, to.lng];
   const center: [number, number] = [
     (from.lat + to.lat) / 2,
     (from.lng + to.lng) / 2,
   ];
-  const isReal = !!(path && path.length > 1);
 
   return (
     <div className="h-[420px] w-full overflow-hidden rounded-2xl border border-border">
@@ -80,10 +83,10 @@ export function RouteMap({
             dashArray: isReal ? undefined : "8 8",
           }}
         />
-        <Marker position={positions[0]} icon={Comp.icon}>
+        <Marker position={startPos} icon={Comp.icon}>
           <Tooltip permanent direction="top" offset={[0, -10]}>{fromName}</Tooltip>
         </Marker>
-        <Marker position={positions[1]} icon={Comp.iconTo}>
+        <Marker position={endPos} icon={Comp.iconTo}>
           <Tooltip permanent direction="top" offset={[0, -10]}>{toName}</Tooltip>
         </Marker>
       </MapContainer>
