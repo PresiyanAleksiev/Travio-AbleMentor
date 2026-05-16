@@ -423,3 +423,97 @@ function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } 
     </article>
   );
 }
+
+function BdzScheduleSection({
+  isLoading,
+  isError,
+  data,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  data: { supported: boolean; fromName?: string; toName?: string; date?: string; departures: BdzDeparture[]; error?: string } | undefined;
+}) {
+  if (isLoading) {
+    return (
+      <section>
+        <SectionHeader icon={Train} title="Train schedule (БДЖ)" subtitle="Live departures from Bulgarian Railways" />
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
+          Loading live BDŽ schedule…
+        </div>
+      </section>
+    );
+  }
+  if (!data || isError) return null;
+  if (!data.supported) {
+    return (
+      <section>
+        <SectionHeader icon={Train} title="Train schedule (БДЖ)" subtitle="Live departures from Bulgarian Railways" />
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
+          No BDŽ station mapped for this route yet.
+        </div>
+      </section>
+    );
+  }
+  if (data.error) {
+    return (
+      <section>
+        <SectionHeader icon={Train} title="Train schedule (БДЖ)" subtitle="Live departures from Bulgarian Railways" />
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-center text-sm text-muted-foreground">
+          Couldn't reach БДЖ: {data.error}
+        </div>
+      </section>
+    );
+  }
+  if (data.departures.length === 0) {
+    return (
+      <section>
+        <SectionHeader icon={Train} title="Train schedule (БДЖ)" subtitle={`No direct departures found for ${data.date ?? "today"}`} />
+      </section>
+    );
+  }
+  const next = data.departures.slice(0, 6);
+  return (
+    <section>
+      <SectionHeader
+        icon={Train}
+        title="Train schedule (БДЖ)"
+        subtitle={`Live from Bulgarian Railways · ${data.fromName} → ${data.toName} · ${data.date}`}
+      />
+      <div className="overflow-hidden rounded-2xl border border-border bg-card" style={{ boxShadow: "var(--shadow-card)" }}>
+        <ul className="divide-y divide-border">
+          {next.map((d, i) => (
+            <li key={`${d.trainName}-${d.departTime}-${i}`} className="grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 sm:grid-cols-[1.2fr_1fr_auto]">
+              <div>
+                <div className="font-display text-lg font-bold text-foreground tabular-nums">
+                  {d.departTime} <span className="text-muted-foreground">→</span> {d.arriveTime}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {d.trainName} · {d.distanceKm} km
+                  {d.transfers > 0 ? ` · ${d.transfers} transfer${d.transfers > 1 ? "s" : ""}` : " · direct"}
+                </div>
+              </div>
+              <div className="hidden text-sm text-foreground sm:block">
+                <Clock className="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />
+                {d.totalTime}
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                {d.hasFirstClass && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">1st</span>
+                )}
+                {d.hasSecondClass && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">2nd</span>
+                )}
+                {d.isDelayed && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">delayed</span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Source: tickets.bdz.bg · prices on the card above are estimates; click БДЖ to book.
+      </p>
+    </section>
+  );
+}
