@@ -9,6 +9,7 @@ import {
 import { CITY_COORDS, LANDMARKS, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
 import { getDirections } from "@/lib/directions.functions";
+import { getBdzSchedule, type BdzDeparture } from "@/lib/bdz.functions";
 import { RouteMap } from "@/components/RouteMap";
 import { Header, Footer } from "./index";
 
@@ -58,10 +59,10 @@ function lookupCoords(name: string): Coords | null {
   return CITY_COORDS[name.trim().toLowerCase()] ?? null;
 }
 
-function generateRoutes(seed: number, km: number, realDriveMin?: number): RouteOption[] {
+function generateRoutes(seed: number, km: number, realDriveMin?: number, trainMin?: number): RouteOption[] {
   const fastestTotalMin = realDriveMin ?? Math.max(45, Math.round((km / 95) * 60));
   const cheapestTotalMin = Math.round((km / 70) * 60) + 60;
-  const convTotalMin = Math.round((km / 80) * 60) + 20;
+  const convTotalMin = trainMin ?? Math.round((km / 80) * 60) + 20;
 
   const fuel = Math.round(km * 0.085 * 10) / 10;
   const tolls = km > 200 ? Math.round((km * 0.012) * 10) / 10 : 0;
@@ -157,22 +158,35 @@ function ResultsPage() {
     staleTime: 1000 * 60 * 60,
   });
 
+  const fetchBdz = useServerFn(getBdzSchedule);
+  const bdzQuery = useQuery({
+    queryKey: ["bdz", from, to],
+    enabled: !!from && !!to,
+    queryFn: () => fetchBdz({ data: { from, to } }),
+    staleTime: 1000 * 60 * 10,
+  });
+
   const trip = useMemo(() => {
     if (!base) return null;
     const dir = directionsQuery.data;
     const decoded = dir ? decodePolyline(dir.polyline).map(([lat, lng]) => ({ lat, lng })) : undefined;
     const km = dir ? Math.round(dir.distanceKm) : roadKm(base.fromCoords, base.toCoords);
     const realDriveMin = dir?.durationMin;
+    const nextTrain = bdzQuery.data?.departures.find((d) => {
+      // pick the next upcoming departure if today's data
+      return true;
+    });
+    const trainMin = nextTrain?.totalMinutes;
     return {
       ...base,
       km,
       pathLatLng: decoded ? (decoded.map((c) => [c.lat, c.lng]) as Array<[number, number]>) : undefined,
       pathCoords: decoded,
-      routes: generateRoutes(base.seed, km, realDriveMin),
+      routes: generateRoutes(base.seed, km, realDriveMin, trainMin),
       alerts: generateAlerts(base.seed),
       landmarks: landmarksAlongRoute(base.fromCoords, base.toCoords, decoded),
     };
-  }, [base, directionsQuery.data]);
+  }, [base, directionsQuery.data, bdzQuery.data]);
 
   return (
     <main className="min-h-screen bg-background">
@@ -253,6 +267,12 @@ function ResultsPage() {
                 </div>
               )}
             </section>
+
+            <BdzScheduleSection
+              isLoading={bdzQuery.isLoading}
+              isError={bdzQuery.isError}
+              data={bdzQuery.data}
+            />
           </div>
         )}
       </section>
