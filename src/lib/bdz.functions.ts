@@ -1,27 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-// Major Bulgarian city → BDŽ station ID (from api/Nomenclatures/GetNomenclatures)
-const STATION_IDS: Record<string, number> = {
-  sofia: 2,
-  plovdiv: 3,
-  varna: 4,
-  burgas: 9,
-  ruse: 7,
-  "stara zagora": 8,
-  pleven: 6,
-  "veliko tarnovo": 26,
-  blagoevgrad: 25,
-  shumen: 19,
-  sliven: 18,
-  pernik: 23,
-  vidin: 17,
-  haskovo: 24,
-  bansko: 92,
-};
+// Cities supported by razpisanie.bdz.bg slugs. The site accepts dash-separated
+// lowercase names (e.g. "veliko-tarnovo"). Any non-supported city returns
+// { supported: false } so the UI can fall back gracefully.
+const SUPPORTED_CITIES = new Set([
+  "sofia", "plovdiv", "varna", "burgas", "ruse", "stara zagora", "pleven",
+  "veliko tarnovo", "blagoevgrad", "shumen", "sliven", "pernik", "vidin",
+  "haskovo", "bansko", "razlog", "karlovo", "gorna oryahovitsa", "dobrich",
+  "kazanlak", "asenovgrad", "lovech", "yambol", "dimitrovgrad", "mezdra",
+]);
 
-export function bdzStationId(name: string): number | null {
-  return STATION_IDS[name.trim().toLowerCase()] ?? null;
+function citySlug(name: string): string | null {
+  const key = name.trim().toLowerCase();
+  if (!SUPPORTED_CITIES.has(key)) return null;
+  return key.replace(/\s+/g, "-");
 }
 
 const Input = z.object({
@@ -31,15 +24,15 @@ const Input = z.object({
 });
 
 export interface BdzDeparture {
-  trainName: string;       // "БВ 8611"
-  departTime: string;      // "06:30"
-  arriveTime: string;      // "09:14"
-  departDate: string;      // "17.05.2026"
+  trainName: string;
+  departTime: string;
+  arriveTime: string;
+  departDate: string;
   arriveDate: string;
-  totalTime: string;       // "02:44"
+  totalTime: string;
   totalMinutes: number;
   distanceKm: number;
-  transfers: number;       // trains.length - 1
+  transfers: number;
   hasFirstClass: boolean;
   hasSecondClass: boolean;
   isDelayed: boolean;
@@ -54,81 +47,119 @@ export interface BdzScheduleResult {
   error?: string;
 }
 
-function hhmmToMin(s: string): number {
-  const [h, m] = s.split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
+function toDDMMYYYY(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+function parseCard(chunk: string, date: string): BdzDeparture | null {
+  const times = chunk.match(/(\d{2}:\d{2})\s*[—–-]\s*(\d{2}:\d{2})/);
+  if (!times) return null;
+
+  const name = chunk.match(/train-info\/(\d+)\/[^"]+"[^>]*>([^<]+)<\/a>/);
+  const trainName = name ? decodeEntities(name[2]).trim() : "Train";
+
+  const dur = chunk.match(/>(?:(\d+)\s*h\s*)?(\d+)\s*min</);
+  const hours = dur && dur[1] ? Number(dur[1]) : 0;
+  const mins = dur ? Number(dur[2]) : 0;
+  const totalMinutes = hours * 60 + mins;
+  const totalTime = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+
+  const stops = Array.from(
+    chunk.matchAll(/list-inline-item ps-1">([^<]+)<\/li>/g),
+  ).map((m) => decodeEntities(m[1]).trim());
+  const transfers = Math.max(0, stops.length - 2);
+
+  const lower = chunk.toLowerCase();
+  const hasFirstClass =
+    lower.includes("first class") ||
+    lower.includes("1st class") ||
+    lower.includes("1/2 class");
+  const hasSecondClass =
+    lower.includes("second class") ||
+    lower.includes("2nd class") ||
+    lower.includes("1/2 class");
+
+  return {
+    trainName,
+    departTime: times[1],
+    arriveTime: times[2],
+    departDate: date,
+    arriveDate: date,
+    totalTime,
+    totalMinutes,
+    distanceKm: 0,
+    transfers,
+    hasFirstClass,
+    hasSecondClass,
+    isDelayed: lower.includes("delay"),
+  };
 }
 
 export const getBdzSchedule = createServerFn({ method: "POST" })
   .inputValidator((input) => Input.parse(input))
   .handler(async ({ data }): Promise<BdzScheduleResult> => {
-    const fromId = bdzStationId(data.from);
-    const toId = bdzStationId(data.to);
-    if (!fromId || !toId) {
+    const fromSlug = citySlug(data.from);
+    const toSlug = citySlug(data.to);
+    if (!fromSlug || !toSlug) {
       return { supported: false, departures: [] };
     }
-    const date = data.date ?? new Date().toISOString().slice(0, 10);
+    const isoDate = data.date ?? new Date().toISOString().slice(0, 10);
+    const ddmmyyyy = toDDMMYYYY(isoDate);
+    const url = `https://razpisanie.bdz.bg/en/${fromSlug}/${toSlug}/${ddmmyyyy}`;
 
     try {
-      const res = await fetch("https://tickets.bdz.bg/portal/api/POSRoute/Trains", {
-        method: "POST",
+      const res = await fetch(url, {
         headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Origin: "https://bileti.bdz.bg",
-          Referer: "https://bileti.bdz.bg/",
-          "User-Agent": "Mozilla/5.0",
+          "User-Agent":
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
         },
-        body: JSON.stringify([{ date, station_from: fromId, station_to: toId }]),
       });
       if (!res.ok) {
-        return { supported: true, departures: [], error: `BDŽ API error ${res.status}` };
-      }
-      const json = (await res.json()) as Array<{
-        date: string;
-        name: string;
-        options: Array<{
-          total_time: string;
-          total_distance: number;
-          departure_time: string;
-          departure_date: string;
-          arrival_time: string;
-          arrival_date: string;
-          trains: Array<{
-            name: string;
-            information: { first_class: boolean; second_class: boolean };
-            is_delayed: boolean;
-          }>;
-        }>;
-      }>;
-      const group = json[0];
-      if (!group) return { supported: true, departures: [] };
-      const [fromName, toName] = group.name.split(" - ");
-      const departures: BdzDeparture[] = group.options.map((o) => {
-        const trainNames = o.trains.map((t) => t.name).join(" → ");
-        const anyFirst = o.trains.some((t) => t.information.first_class);
-        const anySecond = o.trains.some((t) => t.information.second_class);
-        const anyDelay = o.trains.some((t) => t.is_delayed);
         return {
-          trainName: trainNames,
-          departTime: o.departure_time,
-          arriveTime: o.arrival_time,
-          departDate: o.departure_date,
-          arriveDate: o.arrival_date,
-          totalTime: o.total_time,
-          totalMinutes: hhmmToMin(o.total_time),
-          distanceKm: o.total_distance,
-          transfers: Math.max(0, o.trains.length - 1),
-          hasFirstClass: anyFirst,
-          hasSecondClass: anySecond,
-          isDelayed: anyDelay,
+          supported: true,
+          departures: [],
+          error: `BDŽ site error ${res.status}`,
         };
-      });
+      }
+      const html = await res.text();
+
+      // Each result card starts with the marker class "card uv-card".
+      const parts = html.split('card uv-card').slice(1);
+      const departures: BdzDeparture[] = [];
+      for (const part of parts) {
+        // Limit chunk to a reasonable window to avoid leaking into the next card.
+        const dep = parseCard(part.slice(0, 4000), ddmmyyyy);
+        if (dep) departures.push(dep);
+      }
+
+      // Pull display names from the H1 heading: "Sofia — Plovdiv, 18 May".
+      const heading = html.match(
+        /<h1[^>]*>\s*([^—<]+?)\s*[—–-]\s*([^,<]+?),/,
+      );
+      const fromName = heading
+        ? decodeEntities(heading[1]).trim()
+        : data.from;
+      const toName = heading ? decodeEntities(heading[2]).trim() : data.to;
+
       return {
         supported: true,
         fromName,
         toName,
-        date: group.date,
+        date: ddmmyyyy,
         departures,
       };
     } catch (err) {
