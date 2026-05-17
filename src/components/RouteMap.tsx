@@ -16,16 +16,23 @@ export function RouteMap({
 }) {
   const [mounted, setMounted] = useState(false);
   const [Comp, setComp] = useState<any>(null);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    setIsDark(document.documentElement.classList.contains("dark"));
+
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
     Promise.all([
       import("react-leaflet"),
       import("leaflet"),
       // @ts-ignore
       import("leaflet/dist/leaflet.css"),
     ]).then(([RL, L]) => {
-      // Fix default marker icons (Leaflet expects asset URLs)
       const icon = L.divIcon({
         className: "",
         html: `<div style="background:var(--primary);width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>`,
@@ -40,6 +47,8 @@ export function RouteMap({
       });
       setComp({ RL, icon, iconTo });
     });
+
+    return () => observer.disconnect();
   }, []);
 
   if (!mounted || !Comp) {
@@ -73,6 +82,7 @@ export function RouteMap({
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className={isDark ? "map-tiles-dark" : ""}
         />
         <Polyline
           positions={positions}
@@ -80,7 +90,6 @@ export function RouteMap({
             color: "var(--primary)",
             weight: 4,
             opacity: 0.85,
-            dashArray: isReal ? undefined : "8 8",
           }}
         />
         <Marker position={startPos} icon={Comp.icon}>

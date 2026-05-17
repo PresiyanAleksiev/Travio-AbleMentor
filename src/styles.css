@@ -153,3 +153,4 @@
     letter-spacing: -0.02em;
   }
 }
+.map-tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
