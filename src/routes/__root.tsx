@@ -76,10 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Plan trips across Bulgaria. Compare fastest, cheapest and most convenient routes by bus, train and car." },
       { name: "author", content: "Travio" },
       { property: "og:title", content: "Travio — Smart Travel Planning Across Bulgaria" },
-      { property: "og:description", content: "Compare fastest, cheapest and most convenient routes across Bulgaria." },
+      { property: "og:description", content: "Plan trips across Bulgaria. Compare fastest, cheapest and most convenient routes by bus, train and car." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Travio — Smart Travel Planning Across Bulgaria" },
+      { name: "twitter:description", content: "Plan trips across Bulgaria. Compare fastest, cheapest and most convenient routes by bus, train and car." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/327eff9b-5cae-4517-87a7-bccf74148b1b/id-preview-cbb48df8--826dbfc0-3b7b-4890-8a7e-c555e89e7377.lovable.app-1779027969053.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/327eff9b-5cae-4517-87a7-bccf74148b1b/id-preview-cbb48df8--826dbfc0-3b7b-4890-8a7e-c555e89e7377.lovable.app-1779027969053.png" },
     ],
     links: [
       {
