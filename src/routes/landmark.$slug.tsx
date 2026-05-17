@@ -3,7 +3,7 @@ import { ArrowLeft, Clock, Ticket, CalendarHeart, ExternalLink, MapPin, Lightbul
 import { LANDMARKS } from "@/lib/bulgaria-data";
 import { Header, Footer } from "./index";
 
-export const Route = createFileRoute("/landmark/")({
+export const Route = createFileRoute("/landmark/$slug")({
   loader: ({ params }) => {
     const landmark = LANDMARKS.find((l) => l.slug === params.slug);
     if (!landmark) throw notFound();

@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LandmarkRouteImport } from './routes/landmark.'
+import { Route as LandmarkSlugRouteImport } from './routes/landmark.$slug'
 
 const ResultsRoute = ResultsRouteImport.update({
   id: '/results',
@@ -23,40 +23,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LandmarkRoute = LandmarkRouteImport.update({
-  id: '/landmark/',
-  path: '/landmark/',
+const LandmarkSlugRoute = LandmarkSlugRouteImport.update({
+  id: '/landmark/$slug',
+  path: '/landmark/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/results': typeof ResultsRoute
-  '/landmark/': typeof LandmarkRoute
+  '/landmark/$slug': typeof LandmarkSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/results': typeof ResultsRoute
-  '/landmark': typeof LandmarkRoute
+  '/landmark/$slug': typeof LandmarkSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/results': typeof ResultsRoute
-  '/landmark/': typeof LandmarkRoute
+  '/landmark/$slug': typeof LandmarkSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/results' | '/landmark/'
+  fullPaths: '/' | '/results' | '/landmark/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/results' | '/landmark'
-  id: '__root__' | '/' | '/results' | '/landmark/'
+  to: '/' | '/results' | '/landmark/$slug'
+  id: '__root__' | '/' | '/results' | '/landmark/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ResultsRoute: typeof ResultsRoute
-  LandmarkRoute: typeof LandmarkRoute
+  LandmarkSlugRoute: typeof LandmarkSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,11 +75,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/landmark/': {
-      id: '/landmark/'
-      path: '/landmark'
-      fullPath: '/landmark/'
-      preLoaderRoute: typeof LandmarkRouteImport
+    '/landmark/$slug': {
+      id: '/landmark/$slug'
+      path: '/landmark/$slug'
+      fullPath: '/landmark/$slug'
+      preLoaderRoute: typeof LandmarkSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -88,8 +88,18 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ResultsRoute: ResultsRoute,
-  LandmarkRoute: LandmarkRoute,
+  LandmarkSlugRoute: LandmarkSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
