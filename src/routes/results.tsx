@@ -402,8 +402,10 @@ function AlertCard({ alert }: { alert: Alert }) {
 
 function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } }) {
   return (
-    <article
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-1"
+    <Link
+      to="/landmark/$slug"
+      params={{ slug: landmark.slug }}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-1 hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div
@@ -418,9 +420,12 @@ function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } 
           {landmark.detourKm < 1 ? "on route" : `${landmark.detourKm.toFixed(0)} km off`}
         </span>
       </div>
-      <h4 className="mt-1 font-display text-lg font-bold text-foreground">{landmark.name}</h4>
+      <h4 className="mt-1 font-display text-lg font-bold text-foreground transition-colors group-hover:text-primary">{landmark.name}</h4>
       <p className="mt-1 text-sm text-muted-foreground">{landmark.description}</p>
-    </article>
+      <span className="mt-3 text-xs font-semibold uppercase tracking-wider text-primary opacity-0 transition-opacity group-hover:opacity-100">
+        View details →
+      </span>
+    </Link>
   );
 }
 
