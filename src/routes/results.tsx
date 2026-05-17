@@ -512,7 +512,7 @@ function BdzScheduleSection({
         </ul>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Source: tickets.bdz.bg · prices on the card above are estimates; click БДЖ to book.
+        Source: razpisanie.bdz.bg · prices on the card above are estimates; click БДЖ to book.
       </p>
     </section>
   );
