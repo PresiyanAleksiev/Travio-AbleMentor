@@ -99,7 +99,7 @@ function LandmarkPage() {
                   <Lightbulb className="h-5 w-5 text-primary" /> Travel tips
                 </h2>
                 <ul className="mt-3 space-y-2">
-                  {l.tips.map((tip) => (
+                  {l.tips.map((tip: string) => (
                     <li key={tip} className="flex gap-3 text-sm text-muted-foreground">
                       <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                       <span>{tip}</span>
