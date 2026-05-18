@@ -125,7 +125,7 @@ export function Header() {
           <span className="hidden text-sm text-muted-foreground sm:block">Bulgaria, end to end</span>
           <button
             onClick={() => setDark((d) => !d)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
             aria-label="Toggle dark mode"
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
