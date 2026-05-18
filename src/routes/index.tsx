@@ -74,7 +74,7 @@ function Index() {
             <CityInput label="To" value={to} onChange={setTo} accentDot="bg-secondary" />
             <button
               type="submit"
-              className="group inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 font-semibold text-primary-foreground transition-transform hover:scale-[1.02] active:scale-[0.99]"
+              className="group inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-4 font-semibold text-primary-foreground transition-transform hover:scale-[1.02] active:scale-[0.99]"
               style={{ background: "var(--gradient-hero)" }}
             >
               Find Routes
