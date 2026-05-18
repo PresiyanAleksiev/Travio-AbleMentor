@@ -84,26 +84,6 @@ function Index() {
         </form>
       </section>
 
-      {/* Popular */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        <h2 className="font-display text-2xl font-bold text-foreground">Popular routes</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Tap to autofill, then hit Find Routes.</p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {popular.map(([f, t]) => (
-            <button
-              key={`${f}-${t}`}
-              onClick={() => { setFrom(f); setTo(t); }}
-              className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 text-left transition-all hover:-translate-y-0.5"
-              style={{ boxShadow: "var(--shadow-card)" }}
-            >
-              <span className="font-medium text-foreground">
-                {f} <span className="text-muted-foreground">→</span> {t}
-              </span>
-              <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </button>
-          ))}
-        </div>
-      </section>
 
       <Footer />
     </main>
