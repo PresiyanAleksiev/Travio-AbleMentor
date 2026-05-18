@@ -32,9 +32,10 @@ function Index() {
 
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="flex min-h-screen flex-col bg-background">
       <Header />
 
+      <div className="flex flex-1 flex-col justify-center">
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div
@@ -83,7 +84,7 @@ function Index() {
           </div>
         </form>
       </section>
-
+      </div>
 
       <Footer />
     </main>
