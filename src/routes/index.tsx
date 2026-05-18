@@ -30,10 +30,6 @@ function Index() {
     navigate({ to: "/results", search: { from: from.trim(), to: to.trim() } });
   };
 
-  const popular: Array<[string, string]> = [
-    ["Sofia", "Plovdiv"], ["Sofia", "Bansko"], ["Varna", "Burgas"],
-    ["Plovdiv", "Veliko Tarnovo"], ["Sofia", "Sunny Beach"], ["Burgas", "Sozopol"],
-  ];
 
   return (
     <main className="min-h-screen bg-background">
