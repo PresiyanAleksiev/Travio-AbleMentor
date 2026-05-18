@@ -30,10 +30,6 @@ function Index() {
     navigate({ to: "/results", search: { from: from.trim(), to: to.trim() } });
   };
 
-  const popular: Array<[string, string]> = [
-    ["Sofia", "Plovdiv"], ["Sofia", "Bansko"], ["Varna", "Burgas"],
-    ["Plovdiv", "Veliko Tarnovo"], ["Sofia", "Sunny Beach"], ["Burgas", "Sozopol"],
-  ];
 
   return (
     <main className="min-h-screen bg-background">
@@ -78,7 +74,7 @@ function Index() {
             <CityInput label="To" value={to} onChange={setTo} accentDot="bg-secondary" />
             <button
               type="submit"
-              className="group inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 font-semibold text-primary-foreground transition-transform hover:scale-[1.02] active:scale-[0.99]"
+              className="group inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-4 font-semibold text-primary-foreground transition-transform hover:scale-[1.02] active:scale-[0.99]"
               style={{ background: "var(--gradient-hero)" }}
             >
               Find Routes
@@ -88,26 +84,6 @@ function Index() {
         </form>
       </section>
 
-      {/* Popular */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        <h2 className="font-display text-2xl font-bold text-foreground">Popular routes</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Tap to autofill, then hit Find Routes.</p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {popular.map(([f, t]) => (
-            <button
-              key={`${f}-${t}`}
-              onClick={() => { setFrom(f); setTo(t); }}
-              className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 text-left transition-all hover:-translate-y-0.5"
-              style={{ boxShadow: "var(--shadow-card)" }}
-            >
-              <span className="font-medium text-foreground">
-                {f} <span className="text-muted-foreground">→</span> {t}
-              </span>
-              <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </button>
-          ))}
-        </div>
-      </section>
 
       <Footer />
     </main>
@@ -149,7 +125,7 @@ export function Header() {
           <span className="hidden text-sm text-muted-foreground sm:block">Bulgaria, end to end</span>
           <button
             onClick={() => setDark((d) => !d)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
             aria-label="Toggle dark mode"
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
