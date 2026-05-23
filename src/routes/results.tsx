@@ -306,43 +306,78 @@ function RouteCard({ route }: { route: RouteOption }) {
   const CatIcon = meta.icon;
   return (
     <article
-      className="group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card p-6 transition-all hover:-translate-y-1"
+      className="group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/30"
       style={{ boxShadow: "var(--shadow-card)" }}
     >
-      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${meta.accent}`} />
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <CatIcon className="h-3.5 w-3.5" />{meta.tagline}
+      {/* Gradient header */}
+      <div
+        className={`relative bg-gradient-to-br ${meta.accent} px-6 pt-6 pb-8 text-primary-foreground`}
+      >
+        <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+        <div className="relative flex items-start justify-between">
+          <div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm">
+              <CatIcon className="h-3 w-3" />
+              {meta.tagline}
+            </div>
+            <h3 className="mt-3 text-2xl font-bold leading-tight">{meta.label}</h3>
           </div>
-          <h3 className="mt-1 font-display text-2xl font-bold text-foreground">{meta.label}</h3>
-        </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-foreground">
-          <ModeIcon className="h-5 w-5" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+            <ModeIcon className="h-5 w-5" />
+          </div>
         </div>
       </div>
-      <div className="mt-6 flex items-end justify-between border-t border-border pt-5">
-        <Stat icon={<Clock className="h-4 w-4" />} label="Time" value={`${route.hours}h ${route.minutes.toString().padStart(2, "0")}m`} />
-        <Stat icon={<Euro className="h-4 w-4" />} label="Total" value={`€${route.cost.toFixed(2)}`} align="right" />
+
+      {/* Stats strip */}
+      <div className="-mt-5 mx-4 grid grid-cols-2 rounded-2xl border border-border bg-card shadow-sm">
+        <div className="px-4 py-3 border-r border-border">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Clock className="h-3 w-3" /> Time
+          </div>
+          <div className="mt-0.5 text-xl font-bold text-foreground tabular-nums">
+            {route.hours}h {route.minutes.toString().padStart(2, "0")}m
+          </div>
+        </div>
+        <div className="px-4 py-3 text-right">
+          <div className="flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Total <Euro className="h-3 w-3" />
+          </div>
+          <div className="mt-0.5 text-xl font-bold text-foreground tabular-nums">
+            €{route.cost.toFixed(2)}
+          </div>
+        </div>
       </div>
-      <p className="mt-5 text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{MODE_LABEL[route.mode]}</span> · {route.note}
-      </p>
-      <div className="mt-5 rounded-2xl bg-muted/60 p-4">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cost breakdown</div>
-        <ul className="mt-3 space-y-2">
-          {route.breakdown.filter((b) => b.amount > 0).map((b) => {
-            const Icon = b.icon;
-            return (
-              <li key={b.label} className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 text-foreground">
-                  <Icon className="h-3.5 w-3.5 text-muted-foreground" />{b.label}
-                </span>
-                <span className="font-semibold text-foreground tabular-nums">€{b.amount.toFixed(2)}</span>
-              </li>
-            );
-          })}
-        </ul>
+
+      <div className="flex flex-1 flex-col p-6 pt-5">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{MODE_LABEL[route.mode]}</span> · {route.note}
+        </p>
+
+        <div className="mt-5 flex-1 rounded-2xl bg-muted/50 p-4">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Cost breakdown
+          </div>
+          <ul className="mt-3 space-y-2.5">
+            {route.breakdown
+              .filter((b) => b.amount > 0)
+              .map((b) => {
+                const Icon = b.icon;
+                return (
+                  <li key={b.label} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-foreground">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-card">
+                        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                      </span>
+                      {b.label}
+                    </span>
+                    <span className="font-semibold text-foreground tabular-nums">
+                      €{b.amount.toFixed(2)}
+                    </span>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
       </div>
     </article>
   );
