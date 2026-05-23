@@ -154,3 +154,13 @@
   }
 }
 .map-tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
+
+.font-unified,
+.font-unified h1,
+.font-unified h2,
+.font-unified h3,
+.font-unified h4,
+.font-unified .font-display {
+  font-family: "Inter", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
