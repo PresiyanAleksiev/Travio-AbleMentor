@@ -111,7 +111,7 @@ export function Header() {
   }, [dark]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 pt-10">
+    <div className="w-full px-6 pt-10">
       <div className="flex items-center justify-between">
         <a href="/" className="flex items-center gap-2">
           <div
