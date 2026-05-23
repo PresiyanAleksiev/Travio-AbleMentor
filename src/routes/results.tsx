@@ -189,7 +189,7 @@ function ResultsPage() {
   }, [base, directionsQuery.data, bdzQuery.data]);
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="font-unified min-h-screen bg-background">
       <Header />
 
       <div className="mx-auto max-w-6xl px-6 pt-8">
